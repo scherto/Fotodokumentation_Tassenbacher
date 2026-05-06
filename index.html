@@ -88,6 +88,7 @@ body{font-family:'Barlow',sans-serif;background:var(--light);color:var(--dark);m
   .header{border-radius:0;margin-bottom:10px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   .meta-card{box-shadow:none;border:1px solid #ddd;page-break-inside:avoid;margin-bottom:10px;}
   .field textarea{height:auto!important;overflow:visible!important;min-height:0!important;}
+  .print-text{font-family:'Barlow',sans-serif;font-size:14px;color:#1A2B3C;white-space:pre-wrap;word-break:break-word;padding:8px 11px;border:1.5px solid #E4E8ED;border-radius:8px;background:#F5F6F8;}
   .photo-grid{grid-template-columns:1fr 1fr;gap:8px;}
   .photo-card{box-shadow:none;border:1px solid #ddd;page-break-inside:avoid;}
   .photo-img{height:175px;}
@@ -407,6 +408,25 @@ function showToast(msg) {
 // Init
 loadData();
 updateFooter();
+
+// Print fix: replace textareas with divs so full content shows
+window.addEventListener('beforeprint', () => {
+  document.querySelectorAll('textarea').forEach(ta => {
+    const div = document.createElement('div');
+    div.className = 'print-text';
+    div.setAttribute('data-print-for', ta.id || '');
+    div.textContent = ta.value;
+    ta.style.display = 'none';
+    ta.parentNode.insertBefore(div, ta.nextSibling);
+  });
+});
+window.addEventListener('afterprint', () => {
+  document.querySelectorAll('.print-text').forEach(div => {
+    const ta = div.previousSibling;
+    if (ta && ta.tagName === 'TEXTAREA') ta.style.display = '';
+    div.remove();
+  });
+});
 </script>
 </body>
 </html>
