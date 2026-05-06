@@ -89,9 +89,10 @@ body{font-family:'Barlow',sans-serif;background:var(--light);color:var(--dark);m
   .meta-card{box-shadow:none;border:1px solid #ddd;page-break-inside:avoid;margin-bottom:10px;}
   .field textarea{height:auto!important;overflow:visible!important;min-height:0!important;}
   .print-text{font-family:'Barlow',sans-serif;font-size:14px;color:#1A2B3C;white-space:pre-wrap;word-break:break-word;padding:8px 11px;border:1.5px solid #E4E8ED;border-radius:8px;background:#F5F6F8;}
-  .photo-grid{grid-template-columns:1fr 1fr;gap:8px;}
-  .photo-card{box-shadow:none;border:1px solid #ddd;page-break-inside:avoid;}
-  .photo-img{height:175px;}
+  .photo-grid{grid-template-columns:1fr;gap:10px;}
+  .photo-card{box-shadow:none;border:1px solid #ddd;page-break-inside:avoid;break-inside:avoid;}
+  .photo-card:nth-child(3n){page-break-after:always;break-after:always;}
+  .photo-img{height:auto!important;max-height:340px;width:100%;object-fit:contain;background:#f5f5f5;}
   .add-zone,.actions,.empty,.save-ind{display:none!important;}
   .pdel{display:none!important;}
   .pfooter{display:block!important;}
