@@ -91,7 +91,6 @@ body{font-family:'Barlow',sans-serif;background:var(--light);color:var(--dark);m
   .print-text{font-family:'Barlow',sans-serif;font-size:14px;color:#1A2B3C;white-space:pre-wrap;word-break:break-word;padding:8px 11px;border:1.5px solid #E4E8ED;border-radius:8px;background:#F5F6F8;}
   .photo-grid{grid-template-columns:1fr;gap:10px;}
   .photo-card{box-shadow:none;border:1px solid #ddd;page-break-inside:avoid;break-inside:avoid;overflow:visible;}
-  .photo-card:nth-child(3n){page-break-after:always;break-after:always;}
   .photo-img{display:block;width:100%!important;height:auto!important;max-height:none!important;object-fit:fill!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   .add-zone,.actions,.empty,.save-ind{display:none!important;}
   .pdel{display:none!important;}
@@ -428,6 +427,18 @@ window.addEventListener('beforeprint', () => {
     img.style.objectFit = 'fill';
     img.style.width = '100%';
   });
+  // Page breaks: photo 1 alone on page 1, then 2 per page
+  // Break before index 1 (2nd photo), then before index 3, 5, 7 ...
+  const cards = document.querySelectorAll('.photo-card');
+  cards.forEach((card, i) => {
+    card.style.pageBreakBefore = '';
+    card.style.breakBefore = '';
+    // index 1 = start of page 2, then every 2 after that
+    if (i === 1 || (i > 1 && (i - 1) % 2 === 0)) {
+      card.style.pageBreakBefore = 'always';
+      card.style.breakBefore = 'always';
+    }
+  });
 });
 window.addEventListener('afterprint', () => {
   // Restore textareas
@@ -442,6 +453,11 @@ window.addEventListener('afterprint', () => {
     img.style.maxHeight = '';
     img.style.objectFit = 'cover';
     img.style.width = '100%';
+  });
+  // Reset page breaks
+  document.querySelectorAll('.photo-card').forEach(card => {
+    card.style.pageBreakBefore = '';
+    card.style.breakBefore = '';
   });
 });
 </script>
