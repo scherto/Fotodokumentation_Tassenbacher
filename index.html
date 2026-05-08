@@ -44,7 +44,7 @@ body{font-family:'Barlow',sans-serif;background:var(--light);color:var(--dark);m
 .pnum{position:absolute;top:9px;left:9px;background:var(--orange);color:#fff;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;padding:3px 9px;border-radius:20px;z-index:2;}
 .pdel{position:absolute;top:9px;right:9px;background:rgba(0,0,0,0.45);color:#fff;border:none;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:18px;z-index:2;display:flex;align-items:center;justify-content:center;line-height:1;}
 .pdel:hover{background:#c0392b;}
-.photo-img{width:100%;height:210px;object-fit:cover;display:block;}
+.photo-img{width:100%;height:210px;object-fit:cover;display:block;-webkit-print-color-adjust:exact;}
 .photo-body{padding:11px 13px 13px;}
 .photo-body textarea{width:100%;border:1.5px solid #E4E8ED;border-radius:8px;padding:8px 10px;font-family:'Barlow',sans-serif;font-size:13px;color:var(--dark);background:var(--light);outline:none;resize:none;min-height:58px;transition:border-color .15s;}
 .photo-body textarea:focus{border-color:var(--orange);}
@@ -90,9 +90,9 @@ body{font-family:'Barlow',sans-serif;background:var(--light);color:var(--dark);m
   .field textarea{height:auto!important;overflow:visible!important;min-height:0!important;}
   .print-text{font-family:'Barlow',sans-serif;font-size:14px;color:#1A2B3C;white-space:pre-wrap;word-break:break-word;padding:8px 11px;border:1.5px solid #E4E8ED;border-radius:8px;background:#F5F6F8;}
   .photo-grid{grid-template-columns:1fr;gap:10px;}
-  .photo-card{box-shadow:none;border:1px solid #ddd;page-break-inside:avoid;break-inside:avoid;}
+  .photo-card{box-shadow:none;border:1px solid #ddd;page-break-inside:avoid;break-inside:avoid;overflow:visible;}
   .photo-card:nth-child(3n){page-break-after:always;break-after:always;}
-  .photo-img{height:auto!important;max-height:340px;width:100%;object-fit:contain;background:#f5f5f5;}
+  .photo-img{display:block;width:100%!important;height:auto!important;max-height:none!important;object-fit:fill!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   .add-zone,.actions,.empty,.save-ind{display:none!important;}
   .pdel{display:none!important;}
   .pfooter{display:block!important;}
@@ -412,6 +412,7 @@ updateFooter();
 
 // Print fix: replace textareas with divs so full content shows
 window.addEventListener('beforeprint', () => {
+  // Fix textareas
   document.querySelectorAll('textarea').forEach(ta => {
     const div = document.createElement('div');
     div.className = 'print-text';
@@ -420,12 +421,27 @@ window.addEventListener('beforeprint', () => {
     ta.style.display = 'none';
     ta.parentNode.insertBefore(div, ta.nextSibling);
   });
+  // Fix images for iOS Safari: force auto height
+  document.querySelectorAll('.photo-img').forEach(img => {
+    img.style.height = 'auto';
+    img.style.maxHeight = 'none';
+    img.style.objectFit = 'fill';
+    img.style.width = '100%';
+  });
 });
 window.addEventListener('afterprint', () => {
+  // Restore textareas
   document.querySelectorAll('.print-text').forEach(div => {
     const ta = div.previousSibling;
     if (ta && ta.tagName === 'TEXTAREA') ta.style.display = '';
     div.remove();
+  });
+  // Restore images
+  document.querySelectorAll('.photo-img').forEach(img => {
+    img.style.height = '210px';
+    img.style.maxHeight = '';
+    img.style.objectFit = 'cover';
+    img.style.width = '100%';
   });
 });
 </script>
