@@ -80,22 +80,43 @@ body{font-family:'Barlow',sans-serif;background:var(--light);color:var(--dark);m
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--dark);color:#fff;padding:10px 22px;border-radius:30px;font-size:13px;font-weight:500;z-index:200;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;}
 .toast.show{opacity:1;}
 
-/* PRINT */
+/* PRINT – alles über JS-injiziertes Layout geregelt */
 @media print{
-  body{background:#fff!important;}
-  .app{max-width:100%;padding:0;}
-  .no-print{display:none!important;}
-  .header{border-radius:0;margin-bottom:10px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  .meta-card{box-shadow:none;border:1px solid #ddd;page-break-inside:avoid;margin-bottom:10px;}
-  .field textarea{height:auto!important;overflow:visible!important;min-height:0!important;}
-  .print-text{font-family:'Barlow',sans-serif;font-size:14px;color:#1A2B3C;white-space:pre-wrap;word-break:break-word;padding:8px 11px;border:1.5px solid #E4E8ED;border-radius:8px;background:#F5F6F8;}
-  .photo-grid{grid-template-columns:1fr;gap:10px;}
-  .photo-card{box-shadow:none;border:1px solid #ddd;page-break-inside:avoid;break-inside:avoid;overflow:visible;}
-  .photo-img{display:block;width:100%!important;height:auto!important;max-height:none!important;object-fit:fill!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  .add-zone,.actions,.empty,.save-ind{display:none!important;}
-  .pdel{display:none!important;}
-  .pfooter{display:block!important;}
+  body{margin:0!important;padding:0!important;background:#fff!important;}
+  .app{display:none!important;}
+  #print-layout{display:block!important;}
+  .print-page{
+    width:210mm;
+    height:277mm;
+    padding:10mm 12mm;
+    overflow:hidden;
+    page-break-after:always;
+    break-after:always;
+    box-sizing:border-box;
+    display:flex;
+    flex-direction:column;
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
+  }
+  .print-page:last-child{page-break-after:auto;break-after:auto;}
+  .print-header{background:#1A2B3C;border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-shrink:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .print-logo{width:36px;height:36px;background:#E8632A;border-radius:7px;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;color:#fff;flex-shrink:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .print-htitle{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:700;color:#fff;}
+  .print-hsub{font-size:10px;color:rgba(255,255,255,0.5);margin-top:1px;}
+  .print-meta{background:#fff;border:1px solid #ddd;border-radius:8px;padding:10px 12px;margin-bottom:8px;flex-shrink:0;}
+  .print-meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;}
+  .print-meta-full{grid-column:1/-1;}
+  .print-meta-label{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:#8A96A3;margin-bottom:2px;}
+  .print-meta-value{font-size:12px;color:#1A2B3C;font-family:'Barlow',sans-serif;}
+  .print-photos{display:flex;flex-direction:column;gap:8px;flex:1;min-height:0;}
+  .print-photo{background:#fff;border:1px solid #ddd;border-radius:8px;overflow:hidden;position:relative;display:flex;flex-direction:column;flex:1;min-height:0;}
+  .print-photo-img{width:100%;flex:1;min-height:0;object-fit:cover;display:block;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .print-photo-body{padding:6px 10px 8px;flex-shrink:0;}
+  .print-photo-num{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;color:#E8632A;margin-bottom:2px;}
+  .print-photo-desc{font-size:11px;color:#1A2B3C;font-family:'Barlow',sans-serif;white-space:pre-wrap;line-height:1.4;}
+  .print-footer{font-size:9px;color:#aaa;text-align:center;padding-top:6px;flex-shrink:0;border-top:1px solid #eee;margin-top:6px;}
 }
+#print-layout{display:none;}
 .pfooter{display:none;}
 </style>
 </head>
@@ -192,6 +213,9 @@ body{font-family:'Barlow',sans-serif;background:var(--light);color:var(--dark);m
     <p style="font-size:10px;color:#999;" id="footerText"></p>
   </div>
 </div>
+
+<!-- Injected print layout -->
+<div id="print-layout"></div>
 
 <script>
 const STORE_KEY = 'fotodoku_tassenbacher_v2';
@@ -409,56 +433,101 @@ function showToast(msg) {
 loadData();
 updateFooter();
 
-// Print fix: replace textareas with divs so full content shows
-window.addEventListener('beforeprint', () => {
-  // Fix textareas
-  document.querySelectorAll('textarea').forEach(ta => {
-    const div = document.createElement('div');
-    div.className = 'print-text';
-    div.setAttribute('data-print-for', ta.id || '');
-    div.textContent = ta.value;
-    ta.style.display = 'none';
-    ta.parentNode.insertBefore(div, ta.nextSibling);
-  });
-  // Fix images for iOS Safari: force auto height
-  document.querySelectorAll('.photo-img').forEach(img => {
-    img.style.height = 'auto';
-    img.style.maxHeight = 'none';
-    img.style.objectFit = 'fill';
-    img.style.width = '100%';
-  });
-  // Page breaks: photo 1 alone on page 1, then 2 per page
-  // Break before index 1 (2nd photo), then before index 3, 5, 7 ...
-  const cards = document.querySelectorAll('.photo-card');
-  cards.forEach((card, i) => {
-    card.style.pageBreakBefore = '';
-    card.style.breakBefore = '';
-    // index 1 = start of page 2, then every 2 after that
-    if (i === 1 || (i > 1 && (i - 1) % 2 === 0)) {
-      card.style.pageBreakBefore = 'always';
-      card.style.breakBefore = 'always';
-    }
-  });
-});
+// Build complete print layout
+function buildPrintLayout() {
+  const pl = document.getElementById('print-layout');
+  pl.innerHTML = '';
+
+  const datum = document.getElementById('f_datum').value;
+  const art = document.getElementById('f_art').value;
+  const bearb = document.getElementById('f_bearbeiter').value;
+  const projekt = document.getElementById('f_projekt').value;
+  const ort = document.getElementById('f_ort').value;
+  const bemerkung = document.getElementById('f_bemerkung').value;
+  const d = datum ? datum.split('-').reverse().join('.') : '';
+  const footerTxt = `${art} · ${d} · ${bearb} · Ingenieurbüro Tassenbacher GmbH · tassenbacher.at`;
+
+  function makeHeader() {
+    return `<div class="print-header">
+      <div class="print-logo">IT</div>
+      <div>
+        <div class="print-htitle">${docTitle}</div>
+        <div class="print-hsub">Ingenieurbüro Tassenbacher GmbH · tassenbacher.at</div>
+      </div>
+    </div>`;
+  }
+
+  function makeMeta() {
+    return `<div class="print-meta">
+      <div class="print-meta-grid">
+        <div class="print-meta-full">
+          <div class="print-meta-label">Projekttitel / Bauvorhaben</div>
+          <div class="print-meta-value">${projekt || '–'}</div>
+        </div>
+        <div>
+          <div class="print-meta-label">Ort / Adresse</div>
+          <div class="print-meta-value">${ort || '–'}</div>
+        </div>
+        <div>
+          <div class="print-meta-label">Datum der Begehung</div>
+          <div class="print-meta-value">${d || '–'}</div>
+        </div>
+        <div>
+          <div class="print-meta-label">Bearbeiter</div>
+          <div class="print-meta-value">${bearb || '–'}</div>
+        </div>
+        <div>
+          <div class="print-meta-label">Art der Begehung</div>
+          <div class="print-meta-value">${art || '–'}</div>
+        </div>
+        ${bemerkung ? `<div class="print-meta-full">
+          <div class="print-meta-label">Bemerkung</div>
+          <div class="print-meta-value" style="white-space:pre-wrap;">${bemerkung}</div>
+        </div>` : ''}
+      </div>
+    </div>`;
+  }
+
+  function makePhotoCard(p, i) {
+    return `<div class="print-photo">
+      <img class="print-photo-img" src="${p.src}" alt="Foto ${i+1}"/>
+      <div class="print-photo-body">
+        <div class="print-photo-num">Foto #${i+1}</div>
+        ${p.desc ? `<div class="print-photo-desc">${p.desc}</div>` : ''}
+      </div>
+    </div>`;
+  }
+
+  function makeFooter() {
+    return `<div class="print-footer">${footerTxt}</div>`;
+  }
+
+  // Page 1: header + meta + 1 photo
+  const page1 = document.createElement('div');
+  page1.className = 'print-page';
+  page1.innerHTML = makeHeader() + makeMeta() +
+    (photos.length > 0
+      ? `<div class="print-photos">${makePhotoCard(photos[0], 0)}</div>`
+      : '') +
+    makeFooter();
+  pl.appendChild(page1);
+
+  // Remaining pages: 2 photos each
+  for (let i = 1; i < photos.length; i += 2) {
+    const page = document.createElement('div');
+    page.className = 'print-page';
+    let photosHtml = makePhotoCard(photos[i], i);
+    if (photos[i+1]) photosHtml += makePhotoCard(photos[i+1], i+1);
+    page.innerHTML = makeHeader() +
+      `<div class="print-photos">${photosHtml}</div>` +
+      makeFooter();
+    pl.appendChild(page);
+  }
+}
+
+window.addEventListener('beforeprint', buildPrintLayout);
 window.addEventListener('afterprint', () => {
-  // Restore textareas
-  document.querySelectorAll('.print-text').forEach(div => {
-    const ta = div.previousSibling;
-    if (ta && ta.tagName === 'TEXTAREA') ta.style.display = '';
-    div.remove();
-  });
-  // Restore images
-  document.querySelectorAll('.photo-img').forEach(img => {
-    img.style.height = '210px';
-    img.style.maxHeight = '';
-    img.style.objectFit = 'cover';
-    img.style.width = '100%';
-  });
-  // Reset page breaks
-  document.querySelectorAll('.photo-card').forEach(card => {
-    card.style.pageBreakBefore = '';
-    card.style.breakBefore = '';
-  });
+  document.getElementById('print-layout').innerHTML = '';
 });
 </script>
 </body>
