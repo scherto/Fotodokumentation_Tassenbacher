@@ -50,6 +50,23 @@ body{font-family:'Barlow',sans-serif;background:var(--light);color:var(--dark);m
 .photo-body textarea:focus{border-color:var(--orange);}
 .photo-body textarea::placeholder{color:#bbb;}
 
+
+/* PROJECT BAR */
+.project-bar{display:flex;gap:8px;margin-bottom:14px;}
+.project-bar select{flex:1;border:1.5px solid #E4E8ED;border-radius:10px;padding:10px 12px;font-family:'Barlow',sans-serif;font-size:14px;font-weight:600;color:var(--dark);background:#fff;outline:none;-webkit-appearance:none;box-shadow:0 2px 8px rgba(0,0,0,0.05);}
+.pbtn{border:none;border-radius:10px;padding:10px 14px;font-family:'Barlow',sans-serif;font-size:14px;font-weight:600;cursor:pointer;background:var(--dark);color:#fff;transition:all .15s;}
+.pbtn:hover{background:#0f1d2b;}
+.pbtn-del{background:#E4E8ED;color:#8A96A3;}
+.pbtn-del:hover{background:#fde8e8;color:#c0392b;}
+
+/* PHOTO TOOLS (Diktat + Bausteine) */
+.photo-tools{display:flex;gap:6px;margin-bottom:7px;}
+.tpl-select{flex:1;min-width:0;border:1.5px solid #E4E8ED;border-radius:8px;padding:6px 8px;font-family:'Barlow',sans-serif;font-size:12px;color:#7A8690;background:var(--light);outline:none;-webkit-appearance:none;}
+.mic-btn,.tplsave-btn{border:1.5px solid #E4E8ED;background:var(--light);border-radius:8px;width:36px;flex-shrink:0;cursor:pointer;font-size:15px;padding:0;transition:all .15s;}
+.mic-btn:hover,.tplsave-btn:hover{border-color:var(--orange);}
+.mic-btn.rec{background:#c0392b;color:#fff;border-color:#c0392b;animation:pulse .8s infinite;}
+body.no-sr .mic-btn{display:none;}
+
 /* ADD ZONE */
 .add-zone{background:#fff;border:2.5px dashed #D0D8E0;border-radius:14px;margin-bottom:14px;transition:border-color .2s;}
 .add-zone:hover{border-color:var(--orange);}
@@ -63,12 +80,14 @@ body{font-family:'Barlow',sans-serif;background:var(--light);color:var(--dark);m
 .add-btn:hover{background:var(--orange);color:#fff;}
 
 /* ACTIONS */
-.actions{display:flex;gap:10px;margin-bottom:20px;}
+.actions{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;}
 .btn{padding:12px 18px;border:none;border-radius:10px;font-family:'Barlow',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:7px;}
 .btn-pdf{background:var(--orange);color:#fff;flex:1;justify-content:center;}
 .btn-pdf:hover{background:#d4551e;}
 .btn-clear{background:#E4E8ED;color:#8A96A3;}
 .btn-clear:hover{background:#fde8e8;color:#c0392b;}
+.btn-export{background:var(--dark);color:#fff;flex:1;justify-content:center;}
+.btn-export:hover{background:#0f1d2b;}
 
 /* EMPTY */
 .empty{text-align:center;padding:28px 20px;color:#C0C8D0;}
@@ -141,6 +160,14 @@ body{font-family:'Barlow',sans-serif;background:var(--light);color:var(--dark);m
     </div>
   </div>
 
+
+  <!-- Projektleiste -->
+  <div class="project-bar no-print">
+    <select id="projectSelect" onchange="switchProject(this.value)"></select>
+    <button class="pbtn" onclick="newProject()">＋ Neu</button>
+    <button class="pbtn pbtn-del" onclick="deleteProjectUI()" title="Aktuelles Projekt löschen">🗑️</button>
+  </div>
+
   <!-- Meta -->
   <div class="meta-card">
     <div class="field full">
@@ -157,7 +184,7 @@ body{font-family:'Barlow',sans-serif;background:var(--light);color:var(--dark);m
     </div>
     <div class="field">
       <label>Bearbeiter</label>
-      <input id="f_bearbeiter" type="text" value="Ing. Tobias Tassenbacher"/>
+      <input id="f_bearbeiter" type="text" value="Bmstr. Ing. Tobias Schermer"/>
     </div>
     <div class="field">
       <label>Art der Begehung</label>
@@ -205,6 +232,7 @@ body{font-family:'Barlow',sans-serif;background:var(--light);color:var(--dark);m
   <!-- Actions -->
   <div class="actions no-print">
     <button class="btn btn-clear" onclick="clearAll()">🗑️ Leeren</button>
+    <button class="btn btn-export" onclick="exportData()">💾 Daten exportieren</button>
     <button class="btn btn-pdf" onclick="window.print()">📄 Als PDF exportieren</button>
   </div>
 
@@ -218,8 +246,26 @@ body{font-family:'Barlow',sans-serif;background:var(--light);color:var(--dark);m
 <div id="print-layout"></div>
 
 <script>
-const STORE_KEY = 'fotodoku_tassenbacher_v2';
+const STORE_KEY = 'fotodoku_tassenbacher_v3';
+const OLD_KEY   = 'fotodoku_tassenbacher_v2';
+const DEFAULT_BEARBEITER = 'Bmstr. Ing. Tobias Schermer';
+
+const DEFAULT_TEMPLATES = [
+  'Wärmebrücke im Bereich der Fensterlaibung',
+  'Schimmelbefall in der Außenwandecke',
+  'Feuchteschaden im Sockelbereich',
+  'Durchfeuchtung der Wandoberfläche, messtechnisch bestätigt',
+  'Kondensatbildung an der Verglasung',
+  'Luftundichtheit im Anschlussbereich',
+  'Riss im Putz',
+  'Fehlende bzw. beschädigte Abdichtung',
+  'Übersichtsaufnahme',
+  'Detailaufnahme'
+];
+
+let store = { projects: [], activeId: null, templates: [] };
 let photos = [];
+let docTitle = 'Fotodokumentation';
 let saveTimer = null;
 
 // Elements
@@ -230,12 +276,163 @@ const libInput = document.getElementById('libInput');
 const saveDot = document.getElementById('saveDot');
 const saveLabel = document.getElementById('saveLabel');
 
-// Meta field IDs
 const metaFields = ['f_projekt','f_ort','f_datum','f_bearbeiter','f_art','f_bemerkung'];
 
-// Editable title
-let docTitle = 'Fotodokumentation';
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
+function blankProject() {
+  return {
+    id: uid(),
+    title: 'Fotodokumentation',
+    meta: {
+      projekt: '', ort: '',
+      datum: new Date().toISOString().split('T')[0],
+      bearbeiter: DEFAULT_BEARBEITER,
+      art: 'Baustellenbegehung',
+      bemerkung: ''
+    },
+    photos: []
+  };
+}
+
+function activeProject() {
+  let p = store.projects.find(x => x.id === store.activeId);
+  if (!p) { p = store.projects[0]; store.activeId = p.id; }
+  return p;
+}
+
+// ---------- Laden & Migration ----------
+function loadStore() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) {
+      store = JSON.parse(raw);
+      if (!Array.isArray(store.projects) || store.projects.length === 0) store.projects = [blankProject()];
+      if (!Array.isArray(store.templates)) store.templates = [];
+      if (!store.activeId) store.activeId = store.projects[0].id;
+      return;
+    }
+    // Migration von v2 (eine einzelne Doku)
+    const old = localStorage.getItem(OLD_KEY);
+    if (old) {
+      const d = JSON.parse(old);
+      const p = blankProject();
+      if (d.title) p.title = d.title;
+      if (d.meta) Object.keys(p.meta).forEach(k => { if (d.meta[k] !== undefined) p.meta[k] = d.meta[k]; });
+      if (Array.isArray(d.photos)) p.photos = d.photos;
+      store = { projects: [p], activeId: p.id, templates: [] };
+      persist();
+      return;
+    }
+    const p0 = blankProject();
+    store = { projects: [p0], activeId: p0.id, templates: [] };
+    persist();
+  } catch(e) {
+    console.error('Load error', e);
+    const p0 = blankProject();
+    store = { projects: [p0], activeId: p0.id, templates: [] };
+  }
+}
+
+function persist() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); }
+  catch(e) { console.error('Save error', e); showToast('Speichern fehlgeschlagen – Speicher voll?'); }
+}
+
+// ---------- Formular <-> Projekt ----------
+function syncFormFromProject() {
+  const p = activeProject();
+  docTitle = p.title || 'Fotodokumentation';
+  document.getElementById('titleText').textContent = docTitle;
+  metaFields.forEach(id => {
+    const key = id.replace('f_','');
+    document.getElementById(id).value = (p.meta && p.meta[key] !== undefined) ? p.meta[key] : '';
+  });
+  photos = p.photos;
+}
+
+function syncProjectFromForm() {
+  const p = activeProject();
+  p.title = docTitle;
+  metaFields.forEach(id => { p.meta[id.replace('f_','')] = document.getElementById(id).value; });
+  p.photos = photos;
+}
+
+function saveData() {
+  setSaving(true);
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    syncProjectFromForm();
+    persist();
+    renderProjectSelect();
+    setSaving(false);
+  }, 800);
+}
+
+function setSaving(active) {
+  if (active) { saveDot.classList.add('saving'); saveLabel.textContent = 'Speichert …'; }
+  else { saveDot.classList.remove('saving'); saveLabel.textContent = 'Gespeichert'; }
+}
+
+// ---------- Projektverwaltung ----------
+function projectLabel(p) {
+  const name = (p.meta && p.meta.projekt) ? p.meta.projekt : p.title;
+  const d = (p.meta && p.meta.datum) ? p.meta.datum.split('-').reverse().join('.') : '';
+  const n = p.photos ? p.photos.length : 0;
+  return name + (d ? ' · ' + d : '') + ' · ' + n + ' Foto' + (n === 1 ? '' : 's');
+}
+
+function renderProjectSelect() {
+  const sel = document.getElementById('projectSelect');
+  sel.innerHTML = '';
+  store.projects.forEach(p => {
+    const o = document.createElement('option');
+    o.value = p.id;
+    o.textContent = projectLabel(p);
+    if (p.id === store.activeId) o.selected = true;
+    sel.appendChild(o);
+  });
+}
+
+function switchProject(id) {
+  syncProjectFromForm();
+  persist();
+  store.activeId = id;
+  syncFormFromProject();
+  renderPhotos();
+  updateFooter();
+  renderProjectSelect();
+}
+
+function newProject() {
+  syncProjectFromForm();
+  const p = blankProject();
+  store.projects.unshift(p);
+  store.activeId = p.id;
+  persist();
+  syncFormFromProject();
+  renderPhotos();
+  updateFooter();
+  renderProjectSelect();
+  showToast('Neues Projekt angelegt');
+}
+
+function deleteProjectUI() {
+  const p = activeProject();
+  const name = (p.meta && p.meta.projekt) || p.title;
+  if (!confirm('Projekt „' + name + '" mit ' + p.photos.length + ' Foto(s) löschen?')) return;
+  store.projects = store.projects.filter(x => x.id !== p.id);
+  if (store.projects.length === 0) store.projects = [blankProject()];
+  store.activeId = store.projects[0].id;
+  persist();
+  syncFormFromProject();
+  renderPhotos();
+  updateFooter();
+  renderProjectSelect();
+  showToast('Projekt gelöscht');
+}
+
+// ---------- Titel bearbeiten ----------
 function startEditTitle() {
   const disp = document.getElementById('titleDisplay');
   const inp = document.getElementById('titleInput');
@@ -257,67 +454,7 @@ function finishEditTitle() {
   saveData();
 }
 
-// Init date
-document.getElementById('f_datum').value = new Date().toISOString().split('T')[0];
-
-// Load from localStorage
-function loadData() {
-  try {
-    const raw = localStorage.getItem(STORE_KEY);
-    if (!raw) return;
-    const data = JSON.parse(raw);
-    // Restore title
-    if (data.title) {
-      docTitle = data.title;
-      document.getElementById('titleText').textContent = docTitle;
-    }
-    // Restore meta
-    metaFields.forEach(id => {
-      const key = id.replace('f_','');
-      if (data.meta && data.meta[key] !== undefined) {
-        document.getElementById(id).value = data.meta[key];
-      }
-    });
-    // Restore photos
-    photos = data.photos || [];
-    renderPhotos();
-  } catch(e) { console.error('Load error', e); }
-}
-
-// Save to localStorage
-function saveData() {
-  setSaving(true);
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    try {
-      const meta = {};
-      metaFields.forEach(id => { meta[id.replace('f_','')] = document.getElementById(id).value; });
-      const data = { title: docTitle, meta, photos };
-      localStorage.setItem(STORE_KEY, JSON.stringify(data));
-      setSaving(false);
-    } catch(e) {
-      console.error('Save error', e);
-      setSaving(false);
-    }
-  }, 800);
-}
-
-function setSaving(active) {
-  if (active) {
-    saveDot.classList.add('saving');
-    saveLabel.textContent = 'Speichert …';
-  } else {
-    saveDot.classList.remove('saving');
-    saveLabel.textContent = 'Gespeichert';
-  }
-}
-
-// Listen to meta changes
-metaFields.forEach(id => {
-  document.getElementById(id).addEventListener('input', saveData);
-});
-
-// Image compression
+// ---------- Bildkomprimierung ----------
 function compressImage(file) {
   return new Promise(resolve => {
     const reader = new FileReader();
@@ -341,7 +478,6 @@ function compressImage(file) {
   });
 }
 
-// Handle file input
 async function handleFiles(files) {
   for (const file of Array.from(files)) {
     if (!file.type.startsWith('image/')) continue;
@@ -355,11 +491,75 @@ async function handleFiles(files) {
 camInput.addEventListener('change', e => handleFiles(e.target.files));
 libInput.addEventListener('change', e => handleFiles(e.target.files));
 
-// Render photos
+// ---------- Textbausteine ----------
+function allTemplates() {
+  return DEFAULT_TEMPLATES.concat(store.templates || []);
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function templateOptionsHtml() {
+  return allTemplates().map(t => '<option value="' + escapeHtml(t) + '">' + escapeHtml(t) + '</option>').join('');
+}
+
+function applyTemplate(pid, sel) {
+  const val = sel.value;
+  sel.value = '';
+  if (!val) return;
+  const p = photos.find(x => String(x.id) === String(pid));
+  if (!p) return;
+  p.desc = p.desc && p.desc.trim() ? p.desc.trim() + ' – ' + val : val;
+  renderPhotos();
+  saveData();
+}
+
+function saveAsTemplate(pid) {
+  const p = photos.find(x => String(x.id) === String(pid));
+  if (!p || !p.desc || !p.desc.trim()) { showToast('Keine Beschreibung zum Speichern'); return; }
+  const t = p.desc.trim();
+  if (allTemplates().includes(t)) { showToast('Baustein existiert bereits'); return; }
+  store.templates.push(t);
+  persist();
+  renderPhotos();
+  showToast('Als Baustein gespeichert');
+}
+
+// ---------- Diktat (Web Speech API) ----------
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let activeRec = null;
+
+function dictate(pid, btn) {
+  if (!SR) { showToast('Diktat wird von diesem Browser nicht unterstützt'); return; }
+  if (activeRec) { try { activeRec.stop(); } catch(e){} activeRec = null; return; }
+  const rec = new SR();
+  rec.lang = 'de-DE';
+  rec.interimResults = false;
+  rec.maxAlternatives = 1;
+  activeRec = rec;
+  btn.classList.add('rec');
+  rec.onresult = e => {
+    const t = e.results[0][0].transcript;
+    const p = photos.find(x => String(x.id) === String(pid));
+    if (p) {
+      p.desc = p.desc && p.desc.trim() ? p.desc.trim() + ' ' + t : t;
+      renderPhotos();
+      saveData();
+    }
+  };
+  rec.onend = () => { btn.classList.remove('rec'); activeRec = null; };
+  rec.onerror = () => { btn.classList.remove('rec'); activeRec = null; showToast('Diktat abgebrochen'); };
+  rec.start();
+  showToast('Sprechen … (erneut tippen zum Stoppen)');
+}
+
+// ---------- Fotos rendern ----------
 function renderPhotos() {
   if (photos.length === 0) {
     photoGrid.style.display = 'none';
     emptyState.style.display = '';
+    updateFooter();
     return;
   }
   emptyState.style.display = 'none';
@@ -368,14 +568,21 @@ function renderPhotos() {
   photos.forEach((p, i) => {
     const card = document.createElement('div');
     card.className = 'photo-card';
-    card.innerHTML = `
-      <span class="pnum">#${i+1}</span>
-      <button class="pdel no-print" onclick="deletePhoto('${p.id}')">×</button>
-      <img class="photo-img" src="${p.src}" alt="Foto ${i+1}"/>
-      <div class="photo-body">
-        <textarea placeholder="Bildbeschreibung eingeben …" rows="3" oninput="updateDesc('${p.id}', this.value)">${p.desc}</textarea>
-      </div>
-    `;
+    card.innerHTML =
+      '<span class="pnum">#' + (i+1) + '</span>' +
+      '<button class="pdel no-print" onclick="deletePhoto(\'' + p.id + '\')">×</button>' +
+      '<img class="photo-img" src="' + p.src + '" alt="Foto ' + (i+1) + '"/>' +
+      '<div class="photo-body">' +
+        '<div class="photo-tools no-print">' +
+          '<select class="tpl-select" onchange="applyTemplate(\'' + p.id + '\', this)">' +
+            '<option value="">📋 Baustein einfügen …</option>' +
+            templateOptionsHtml() +
+          '</select>' +
+          '<button class="mic-btn" title="Beschreibung diktieren" onclick="dictate(\'' + p.id + '\', this)">🎤</button>' +
+          '<button class="tplsave-btn" title="Beschreibung als Baustein speichern" onclick="saveAsTemplate(\'' + p.id + '\')">＋</button>' +
+        '</div>' +
+        '<textarea placeholder="Bildbeschreibung eingeben …" rows="3" oninput="updateDesc(\'' + p.id + '\', this.value)">' + escapeHtml(p.desc) + '</textarea>' +
+      '</div>';
     photoGrid.appendChild(card);
   });
   updateFooter();
@@ -388,36 +595,67 @@ function updateDesc(id, value) {
 
 function deletePhoto(id) {
   photos = photos.filter(x => String(x.id) !== String(id));
+  activeProject().photos = photos;
   renderPhotos();
   saveData();
 }
 
 function clearAll() {
-  if (!confirm('Alle Fotos und Daten löschen?')) return;
-  photos = [];
-  docTitle = 'Fotodokumentation';
-  document.getElementById('titleText').textContent = docTitle;
-  metaFields.forEach(id => {
-    const el = document.getElementById(id);
-    if (id === 'f_datum') el.value = new Date().toISOString().split('T')[0];
-    else if (id === 'f_bearbeiter') el.value = 'Ing. Tobias Tassenbacher';
-    else if (id === 'f_art') el.value = 'Baustellenbegehung';
-    else el.value = '';
-  });
-  localStorage.removeItem(STORE_KEY);
+  if (!confirm('Fotos und Daten dieses Projekts löschen?')) return;
+  const p = activeProject();
+  p.photos = [];
+  p.title = 'Fotodokumentation';
+  p.meta = blankProject().meta;
+  persist();
+  syncFormFromProject();
   renderPhotos();
-  showToast('Dokumentation geleert');
+  renderProjectSelect();
+  showToast('Projekt geleert');
 }
 
+// ---------- Datenexport ----------
+function exportData() {
+  syncProjectFromForm();
+  const p = activeProject();
+  if (p.photos.length === 0 && !p.meta.projekt) { showToast('Nichts zu exportieren'); return; }
+  const data = {
+    app: 'Fotodokumentation_Tassenbacher',
+    version: 3,
+    exportedAt: new Date().toISOString(),
+    title: p.title,
+    meta: p.meta,
+    photoCount: p.photos.length,
+    photos: p.photos
+  };
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const slug = (p.meta.projekt || p.title || 'Fotodoku')
+    .replace(/[^\w\säöüÄÖÜß-]/g,'').trim().replace(/\s+/g,'_').slice(0,40) || 'Fotodoku';
+  const datum = p.meta.datum || new Date().toISOString().split('T')[0];
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'Fotodoku_' + slug + '_' + datum + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  showToast('Export erstellt · ' + p.photos.length + ' Foto' + (p.photos.length === 1 ? '' : 's'));
+}
+
+// ---------- Fußzeile ----------
 function updateFooter() {
   const datum = document.getElementById('f_datum').value;
   const art = document.getElementById('f_art').value;
   const bearb = document.getElementById('f_bearbeiter').value;
   const d = datum ? datum.split('-').reverse().join('.') : '';
   document.getElementById('footerText').textContent =
-    `${art} · ${d} · ${bearb} · Ingenieurbüro Tassenbacher GmbH · tassenbacher.at`;
+    art + ' · ' + d + ' · ' + bearb + ' · Ingenieurbüro Tassenbacher GmbH · tassenbacher.at';
 }
 
+metaFields.forEach(id => {
+  document.getElementById(id).addEventListener('input', saveData);
+});
 document.getElementById('f_datum').addEventListener('change', updateFooter);
 document.getElementById('f_art').addEventListener('change', updateFooter);
 document.getElementById('f_bearbeiter').addEventListener('input', updateFooter);
@@ -429,11 +667,15 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 2500);
 }
 
-// Init
-loadData();
+// ---------- Init ----------
+loadStore();
+syncFormFromProject();
+renderProjectSelect();
+renderPhotos();
 updateFooter();
+if (!SR) document.body.classList.add('no-sr');
 
-// Build complete print layout
+// ---------- Drucklayout ----------
 function buildPrintLayout() {
   const pl = document.getElementById('print-layout');
   pl.innerHTML = '';
@@ -445,81 +687,66 @@ function buildPrintLayout() {
   const ort = document.getElementById('f_ort').value;
   const bemerkung = document.getElementById('f_bemerkung').value;
   const d = datum ? datum.split('-').reverse().join('.') : '';
-  const footerTxt = `${art} · ${d} · ${bearb} · Ingenieurbüro Tassenbacher GmbH · tassenbacher.at`;
+  const footerTxt = art + ' · ' + d + ' · ' + bearb + ' · Ingenieurbüro Tassenbacher GmbH · tassenbacher.at';
 
   function makeHeader() {
-    return `<div class="print-header">
-      <div class="print-logo">IT</div>
-      <div>
-        <div class="print-htitle">${docTitle}</div>
-        <div class="print-hsub">Ingenieurbüro Tassenbacher GmbH · tassenbacher.at</div>
-      </div>
-    </div>`;
+    return '<div class="print-header">' +
+      '<div class="print-logo">IT</div>' +
+      '<div>' +
+        '<div class="print-htitle">' + escapeHtml(docTitle) + '</div>' +
+        '<div class="print-hsub">Ingenieurbüro Tassenbacher GmbH · tassenbacher.at</div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function metaCell(label, value, full) {
+    return '<div' + (full ? ' class="print-meta-full"' : '') + '>' +
+      '<div class="print-meta-label">' + label + '</div>' +
+      '<div class="print-meta-value"' + (full === 'pre' ? ' style="white-space:pre-wrap;"' : '') + '>' + (value ? escapeHtml(value) : '–') + '</div>' +
+    '</div>';
   }
 
   function makeMeta() {
-    return `<div class="print-meta">
-      <div class="print-meta-grid">
-        <div class="print-meta-full">
-          <div class="print-meta-label">Projekttitel / Bauvorhaben</div>
-          <div class="print-meta-value">${projekt || '–'}</div>
-        </div>
-        <div>
-          <div class="print-meta-label">Ort / Adresse</div>
-          <div class="print-meta-value">${ort || '–'}</div>
-        </div>
-        <div>
-          <div class="print-meta-label">Datum der Begehung</div>
-          <div class="print-meta-value">${d || '–'}</div>
-        </div>
-        <div>
-          <div class="print-meta-label">Bearbeiter</div>
-          <div class="print-meta-value">${bearb || '–'}</div>
-        </div>
-        <div>
-          <div class="print-meta-label">Art der Begehung</div>
-          <div class="print-meta-value">${art || '–'}</div>
-        </div>
-        ${bemerkung ? `<div class="print-meta-full">
-          <div class="print-meta-label">Bemerkung</div>
-          <div class="print-meta-value" style="white-space:pre-wrap;">${bemerkung}</div>
-        </div>` : ''}
-      </div>
-    </div>`;
+    return '<div class="print-meta"><div class="print-meta-grid">' +
+      metaCell('Projekttitel / Bauvorhaben', projekt, true) +
+      metaCell('Ort / Adresse', ort) +
+      metaCell('Datum der Begehung', d) +
+      metaCell('Bearbeiter', bearb) +
+      metaCell('Art der Begehung', art) +
+      (bemerkung ? '<div class="print-meta-full"><div class="print-meta-label">Bemerkung</div><div class="print-meta-value" style="white-space:pre-wrap;">' + escapeHtml(bemerkung) + '</div></div>' : '') +
+    '</div></div>';
   }
 
   function makePhotoCard(p, i) {
-    return `<div class="print-photo">
-      <img class="print-photo-img" src="${p.src}" alt="Foto ${i+1}"/>
-      <div class="print-photo-body">
-        <div class="print-photo-num">Foto #${i+1}</div>
-        ${p.desc ? `<div class="print-photo-desc">${p.desc}</div>` : ''}
-      </div>
-    </div>`;
+    return '<div class="print-photo">' +
+      '<img class="print-photo-img" src="' + p.src + '" alt="Foto ' + (i+1) + '"/>' +
+      '<div class="print-photo-body">' +
+        '<div class="print-photo-num">Foto #' + (i+1) + '</div>' +
+        (p.desc ? '<div class="print-photo-desc">' + escapeHtml(p.desc) + '</div>' : '') +
+      '</div>' +
+    '</div>';
   }
 
   function makeFooter() {
-    return `<div class="print-footer">${footerTxt}</div>`;
+    return '<div class="print-footer">' + escapeHtml(footerTxt) + '</div>';
   }
 
-  // Page 1: header + meta + 1 photo
   const page1 = document.createElement('div');
   page1.className = 'print-page';
   page1.innerHTML = makeHeader() + makeMeta() +
     (photos.length > 0
-      ? `<div class="print-photos">${makePhotoCard(photos[0], 0)}</div>`
+      ? '<div class="print-photos">' + makePhotoCard(photos[0], 0) + '</div>'
       : '') +
     makeFooter();
   pl.appendChild(page1);
 
-  // Remaining pages: 2 photos each
   for (let i = 1; i < photos.length; i += 2) {
     const page = document.createElement('div');
     page.className = 'print-page';
     let photosHtml = makePhotoCard(photos[i], i);
     if (photos[i+1]) photosHtml += makePhotoCard(photos[i+1], i+1);
     page.innerHTML = makeHeader() +
-      `<div class="print-photos">${photosHtml}</div>` +
+      '<div class="print-photos">' + photosHtml + '</div>' +
       makeFooter();
     pl.appendChild(page);
   }
@@ -529,6 +756,7 @@ window.addEventListener('beforeprint', buildPrintLayout);
 window.addEventListener('afterprint', () => {
   document.getElementById('print-layout').innerHTML = '';
 });
+
 </script>
 </body>
 </html>
